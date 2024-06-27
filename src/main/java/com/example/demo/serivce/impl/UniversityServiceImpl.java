@@ -2,6 +2,8 @@ package com.example.demo.serivce.impl;
 
 import com.example.demo.entity.University;
 import com.example.demo.serivce.UniversityService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -15,46 +17,38 @@ import java.util.concurrent.Executors;
 
 @Service
 public class UniversityServiceImpl implements UniversityService {
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final String API_URL = "http://universities.hipolabs.com/search";
+    private final RestTemplate rt;
+    private final ExecutorService pool;
 
-    public List<University> searchUniversities() {
-        University[] universities = restTemplate.getForObject(API_URL, University[].class);
-        return processUniversities(universities);
+    @Value("${university-url}")
+    private String url;
+
+    @Autowired
+    public UniversityServiceImpl(RestTemplate rt, ExecutorService pool){
+        this.rt = rt;
+        this.pool = pool;
     }
 
-    public List<University> searchUniversitiesByCountries(List<String> countries) {
-        ExecutorService executor = Executors.newFixedThreadPool(countries.size());
-        List<CompletableFuture<List<University>>> futures = new ArrayList<>();
+    @Override
+    public University[] searchUniversities() {
+        return rt.getForObject(url, University[].class);
+    }
 
-        for (String country : countries) {
-            CompletableFuture<List<University>> future = CompletableFuture.supplyAsync(() -> {
-                University[] universities = restTemplate.getForObject(API_URL + "?country=" + country, University[].class);
-                return processUniversities(universities);
-            }, executor);
+    @Override
+    public List<University> searchUniversitiesByCountries(List<String> countries) {
+        List<CompletableFuture<University[]>> futures = new ArrayList<>();
+        countries.forEach(country -> {
+            CompletableFuture<University[]> future = CompletableFuture.supplyAsync(() -> rt.getForObject(url + "?country=" + country, University[].class), pool);
             futures.add(future);
-        }
+        });
 
         List<University> results = new ArrayList<>();
-        for (CompletableFuture<List<University>> future : futures) {
-            try {
-                results.addAll(future.get());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenAccept(v -> futures.forEach(future -> Optional.ofNullable(future.join()).ifPresent(universities -> results.addAll(Arrays.asList(universities)))))
+                .join();
 
-        executor.shutdown();
+
         return results;
     }
 
-    public List<University> processUniversities(University[] universities) {
-        List<University> responses = new ArrayList<>();
-        if (universities != null) {
-            for (University university : universities) {
-                responses.add(new University(university.getName(), university.getWeb_pages(), university.getDomain()));
-            }
-        }
-        return responses;
-    }
 }

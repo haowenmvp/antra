@@ -11,7 +11,7 @@ import java.util.Optional;
 @Service
 public interface UniversityService {
 
-    List<University> searchUniversities();
+    University[] searchUniversities();
     List<University> searchUniversitiesByCountries(List<String> countries);
-    List<University> processUniversities(University[] universities);
+
 }

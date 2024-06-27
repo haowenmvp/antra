@@ -12,17 +12,21 @@ import java.util.List;
 @RestController
 @RequestMapping("/universities")
 public class UniversityController {
-    @Autowired
-    private UniversityService universityService;
 
-    @GetMapping
-    public ResponseEntity<List<University>> searchUniversities() {
-        List<University> responses = universityService.searchUniversities();
-        return new ResponseEntity<>(responses, HttpStatus.OK);
+    private final UniversityService universityService;
+
+    @Autowired
+    public UniversityController(UniversityService universityService) {
+        this.universityService = universityService;
     }
 
-    @PostMapping
-    public ResponseEntity<List<University>> searchUniversitiesByCountries(@RequestBody List<String> countries) {
+    @GetMapping
+    public ResponseEntity<?> searchUniversities() {
+        return new ResponseEntity<>(universityService.searchUniversities(), HttpStatus.OK);
+    }
+
+    @GetMapping(params = "countries")
+    public ResponseEntity<?> searchUniversitiesByCountries(@RequestParam("countries") List<String> countries) {
         List<University> responses = universityService.searchUniversitiesByCountries(countries);
         return new ResponseEntity<>(responses, HttpStatus.OK);
     }
